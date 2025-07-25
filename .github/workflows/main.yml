@@ -17,7 +17,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git clone https://${{CHEIRO}}:${TOKEN}@github.com/Celfocus-Appsec-Training/devsecops-nb30640.git
+          git clone https://${CHEIRO}:${TOKEN}@github.com/Celfocus-Appsec-Training/devsecops-nb30640.git
           rm -rf repo-b/*
           cp -r ./* repo-b/
           cd repo-b
