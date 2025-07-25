@@ -18,17 +18,19 @@ jobs:
           token: ${{ secrets.TOKEN }}
           path: repo-b
 
-      - name: Copy files from repo A to repo B
+      - name: Copy repo A to repo B (without deleting files, ignoring .git)
         run: |
-          rm -rf repo-b/*
-          rsync -av --exclude='repo-b' ./ repo-b/
+          rsync -av --exclude='.git' --exclude='repo-b' ./ repo-b/
 
-      - name: Commit and Push changes
+      - name: Commit and push changes to repo B
         working-directory: repo-b
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git diff --cached --quiet || git commit -m "Sync from repo A via GitHub Actions"
-          git push origin main
-
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Sync changes from repo A"
+            git push origin main
+          fi
