@@ -10,11 +10,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Checkout B
         uses: actions/checkout@v4
-          with:
-            repository: Celfocus-AppSec-Training/devsecops-nb30640
-            token: ${{ secrets.TOKEN }}
-            path: repo-b
-      - name: ls
-        run: ls
+        with:
+          repository: Celfocus-AppSec-Training/devsecops-nb30640
+          token: ${{ secrets.TOKEN }}
+          path: repo-b
+
+      - name: List repo B contents
+        run: ls repo-b
