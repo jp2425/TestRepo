@@ -8,15 +8,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repo A
         uses: actions/checkout@v4
 
-      - name: Checkout B
+      - name: Checkout repo B
         uses: actions/checkout@v4
         with:
           repository: Celfocus-AppSec-Training/devsecops-nb30640
           token: ${{ secrets.TOKEN }}
           path: repo-b
 
-      - name: List repo B contents
-        run: ls repo-b
+      - name: Copy files from repo A to repo B
+        run: |
+          rm -rf repo-b/*
+          rsync -av --exclude='repo-b' ./ repo-b/
+
+      - name: Commit and Push changes
+        working-directory: repo-b
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff --cached --quiet || git commit -m "Sync from repo A via GitHub Actions"
+          git push origin main
+
