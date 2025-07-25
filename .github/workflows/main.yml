@@ -10,17 +10,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Clone Repo
-        env:
-          TOKEN: ${{ secrets.TOKEN }}
-          CHEIRO: ${{ secrets.CHEIRO }}
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git clone https://${CHEIRO}:${TOKEN}@github.com/Celfocus-Appsec-Training/devsecops-nb30640.git
-          rm -rf repo-b/*
-          cp -r ./* repo-b/
-          cd repo-b
-          git add .
-          git commit -m "Atualização automática do conteúdo via workflow" || echo "Nada para commitar"
-          git push origin main
+      - name: Checkout B
+        uses: actions/checkout@v4
+          with:
+            repository: Celfocus-AppSec-Training/devsecops-nb30640
+            token: ${{ secrets.TOKEN }}
+            path: repo-b
+      - name: ls
+        run: ls
