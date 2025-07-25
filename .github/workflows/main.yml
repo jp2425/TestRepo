@@ -18,9 +18,9 @@ jobs:
           token: ${{ secrets.TOKEN }}
           path: repo-b
 
-      - name: Copy repo A to repo B (without deleting files, ignoring .git)
+      - name: Copy repo A to repo B (ignoring .git and .github)
         run: |
-          rsync -av --exclude='.git' --exclude='repo-b' ./ repo-b/
+          rsync -av --exclude='.git' --exclude='.github' --exclude='repo-b' ./ repo-b/
 
       - name: Commit and push changes to repo B
         working-directory: repo-b
