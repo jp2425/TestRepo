@@ -19,17 +19,19 @@ jobs:
       - name: Copy azure to this repo (ignoring .git and .github)
         run: |
           rsync -av --exclude='.git' --exclude='.github' azure/ ./
-
-      - name: Commit and push changes to repo B
-        # working-directory: repo-b
-        run: |
           rm -r azure/
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Sync changes from repo A"
-            git push origin main
-          fi
+
+      #- name: Commit and push changes to repo B
+        # working-directory: repo-b
+      #  run: |
+      #    rm -r azure/
+      #    git config user.name "github-actions[bot]"
+      #    git config user.email "github-actions[bot]@users.noreply.github.com"
+      #    git add .
+      #    if git diff --cached --quiet; then
+      #      echo "No changes to commit"
+      #    else
+      #      git commit -m "Sync changes from repo A"
+      #      git push origin main
+      #    fi
+      - uses: stefanzweifel/git-auto-commit-action@v6
