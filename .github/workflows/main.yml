@@ -6,7 +6,8 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
       - name: Checkout repo Github
         uses: actions/checkout@v4
