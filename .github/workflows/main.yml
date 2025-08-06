@@ -9,19 +9,22 @@ jobs:
     permissions:
       contents: write
     steps:
-
+    
+      - uses: actions/checkout@v4
+      
       - name: Checkout repo Azure
         run: |
-            git clone https://${{ secrets.USERNAME }}:${{ secrets.AZURE_PAT }}@dev.azure.com/NB30640/RepoSyncTest/_git/RepoSyncTest .
+            git clone https://${{ secrets.USERNAME }}:${{ secrets.AZURE_PAT }}@dev.azure.com/NB30640/RepoSyncTest/_git/RepoSyncTest azure
 
-     # - name: Remove all files except azure/
-     #   run: |
-     #     find . -mindepth 1 ! -name 'azure' ! -path './azure/*' -exec rm -rf {} +
+      - name: Delete everything except .git and .github
+        run: |
+          shopt -s extglob
+          rm -rf !(azure|.git|.github)
 
-     # - name: Copy azure to this repo (ignoring .git and .github)
-     #   run: |
-     #     rsync -av --exclude='.git' --exclude='.github' azure/ ./
-     #    rm -r azure/
+      - name: Copy azure to this repo (ignoring .git and .github)
+        run: |
+          rsync -av --exclude='.git' --exclude='.github' azure/ ./
+          rm -r azure/
 
       #- name: Commit and push changes to repo B
         # working-directory: repo-b
