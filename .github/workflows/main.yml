@@ -8,22 +8,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo A
+      - name: Checkout repo Github
         uses: actions/checkout@v4
 
-      - name: Checkout repo B
-        uses: actions/checkout@v4
-        with:
-          repository: Celfocus-AppSec-Training/devsecops-nb30640
-          token: ${{ secrets.TOKEN }}
-          path: repo-b
-
-      - name: Copy repo A to repo B (ignoring .git and .github)
+      - name: Checkout repo Azure
         run: |
-          rsync -av --exclude='.git' --exclude='.github' --exclude='repo-b' ./ repo-b/
+            git clone https://${{ secrets.USERNAME }}:${{ secrets.AZURE_PAT }}@dev.azure.com/NB30640/RepoSyncTest/_git/RepoSyncTest azure
+
+    
+      - name: Copy azure to this repo (ignoring .git and .github)
+        run: |
+          rsync -av --exclude='.git' --exclude='.github' azure/ ./
 
       - name: Commit and push changes to repo B
-        working-directory: repo-b
+        # working-directory: repo-b
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
