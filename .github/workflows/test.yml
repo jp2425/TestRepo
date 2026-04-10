@@ -118,18 +118,19 @@ jobs:
       - name: Build a zip containing a source tree
         run: |
           mkdir -p /tmp/src/mypackage
-          cat > /tmp/src/pyproject.toml <<'EOF'
-          [build-system]
-          requires = ["setuptools"]
-          build-backend = "setuptools.backends.legacy:build"
-
-          [project]
-          name = "mypackage"
-          version = "1.2.3"
-          EOF
-          cat > /tmp/src/mypackage/__init__.py <<'EOF'
-          __version__ = "1.2.3"
-          EOF
+          python3 - <<'PYEOF'
+          import pathlib
+          src = pathlib.Path('/tmp/src')
+          (src / 'pyproject.toml').write_text(
+              '[build-system]\n'
+              'requires = ["setuptools>=61"]\n'
+              'build-backend = "setuptools.build_meta"\n\n'
+              '[project]\n'
+              'name = "mypackage"\n'
+              'version = "1.2.3"\n'
+          )
+          (src / 'mypackage' / '__init__.py').write_text('__version__ = "1.2.3"\n')
+          PYEOF
           cd /tmp && zip -r /tmp/source.zip src/
           python3 -m http.server 8081 --directory /tmp &
           echo "HTTP_PID=$!" >> "$GITHUB_ENV"
