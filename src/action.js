@@ -1,5 +1,8 @@
 'use strict';
 
+const fs   = require('fs');
+const path = require('path');
+
 /**
  * Orchestrates the full installation pipeline.
  *
@@ -80,6 +83,12 @@ class Action {
 
     // Stage 3 — Extract zip, or use the wheel directly
     if (this.#isWheelUrl(url)) {
+      // tool-cache saves to a UUID path with no extension; pip requires the
+      // .whl extension to recognise the file as a wheel.
+      const wheelName = path.basename(new URL(url).pathname);
+      const wheelPath = path.join(path.dirname(this._downloadedPath), wheelName);
+      fs.renameSync(this._downloadedPath, wheelPath);
+      this._downloadedPath = wheelPath;
       this._core.info('Detected direct wheel URL — skipping extraction.');
       this._target = this._downloadedPath;
     } else {
