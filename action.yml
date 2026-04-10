@@ -1,0 +1,61 @@
+name: 'Python Package Installer'
+description: >
+  Downloads a .zip archive from a given URL and installs the Python package
+  contained within it using pip. Useful for internal packages not published on PyPI.
+
+inputs:
+  url:
+    description: >
+      URL of the package to install. Accepts a .zip archive containing a wheel
+      or source tree, or a direct link to a .whl file.
+    required: true
+
+  token:
+    description: >
+      Optional Bearer authentication token used when downloading the zip
+      (e.g. a GitHub PAT or an internal API token).
+    required: false
+    default: ''
+
+  pip-args:
+    description: >
+      Additional arguments to pass to pip install
+      (e.g. "--upgrade --no-deps --index-url https://pypi.org/simple").
+    required: false
+    default: ''
+
+  checksum:
+    description: >
+      Expected SHA-256 checksum of the downloaded zip archive (lowercase hex string).
+      When provided, the archive is verified before extraction; the step fails
+      immediately if the digest does not match.
+    required: false
+    default: ''
+
+  pip-executable:
+    description: >
+      The pip executable to invoke (e.g. pip3, pip3.12, or an absolute path).
+      Useful when multiple Python versions are installed or when targeting a
+      virtual environment.
+    required: false
+    default: 'pip'
+
+  retries:
+    description: >
+      Number of additional download attempts to make on transient failures.
+      0 means a single attempt with no retries.
+    required: false
+    default: '0'
+
+outputs:
+  package-name:
+    description: 'The normalised name of the installed package.'
+
+  package-version:
+    description: 'The version of the installed package as reported by pip.'
+
+runs:
+  using: 'node20'
+  # Entry point is the pre-bundled file produced by `npm run build`.
+  # Committing dist/index.js means consumers do not need to run `npm install`.
+  main: 'dist/index.js'
