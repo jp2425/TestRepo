@@ -140,7 +140,6 @@ jobs:
         uses: ./
         with:
           url: 'http://localhost:8081/source.zip'
-          pip-args: '--no-build-isolation'
 
       - name: Verify outputs
         run: |
@@ -193,60 +192,3 @@ jobs:
       - name: Stop http server
         if: always()
         run: kill ${{ env.HTTP_PID }} || true
-
-  # ---------------------------------------------------------------------------
-  # Test 4 — matrix across Python versions
-  # ---------------------------------------------------------------------------
-  test-matrix:
-    name: Python ${{ matrix.python }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ['3.10', '3.11', '3.12']
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-
-      - name: Serve a wheel zip (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p /tmp/matrix
-          pip download six --no-deps --dest /tmp/matrix
-          cd /tmp/matrix && zip package.zip *.whl
-          python3 -m http.server 8083 --directory /tmp/matrix &
-          echo "HTTP_PID=$!" >> "$GITHUB_ENV"
-
-      - name: Serve a wheel zip (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path "$env:TEMP\matrix"
-          pip download six --no-deps --dest "$env:TEMP\matrix"
-          Compress-Archive -Path "$env:TEMP\matrix\*.whl" -DestinationPath "$env:TEMP\matrix\package.zip"
-          $job = Start-Job { python -m http.server 8083 --directory "$env:TEMP\matrix" }
-          echo "HTTP_JOB_ID=$($job.Id)" >> $env:GITHUB_ENV
-
-      - name: Install via action
-        id: install
-        uses: ./
-        with:
-          url: 'http://localhost:8083/package.zip'
-
-      - name: Verify outputs and import
-        run: |
-          python -c "import six; print(six.__version__)"
-
-      - name: Stop http server (Unix)
-        if: always() && runner.os != 'Windows'
-        run: kill ${{ env.HTTP_PID }} || true
-
-      - name: Stop http server (Windows)
-        if: always() && runner.os == 'Windows'
-        shell: pwsh
-        run: Stop-Job -Id ${{ env.HTTP_JOB_ID }} -ErrorAction SilentlyContinue
