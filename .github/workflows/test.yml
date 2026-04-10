@@ -1,0 +1,251 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Test 0 — direct .whl URL (no zip involved)
+  # ---------------------------------------------------------------------------
+  test-direct-wheel:
+    name: Install direct .whl URL
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Serve a wheel file directly (no zip)
+        run: |
+          mkdir -p /tmp/direct
+          pip download six --no-deps --dest /tmp/direct
+          python3 -m http.server 8084 --directory /tmp/direct &
+          echo "HTTP_PID=$!" >> "$GITHUB_ENV"
+          # Give the server a moment to start
+          sleep 1
+          WHEEL=$(ls /tmp/direct/*.whl | head -1 | xargs basename)
+          echo "WHEEL_NAME=$WHEEL" >> "$GITHUB_ENV"
+
+      - name: Install via action (direct wheel)
+        id: install
+        uses: ./
+        with:
+          url: 'http://localhost:8084/${{ env.WHEEL_NAME }}'
+
+      - name: Verify outputs
+        run: |
+          echo "package-name:    ${{ steps.install.outputs.package-name }}"
+          echo "package-version: ${{ steps.install.outputs.package-version }}"
+          test -n "${{ steps.install.outputs.package-name }}"
+          test -n "${{ steps.install.outputs.package-version }}"
+
+      - name: Verify package is importable
+        run: python3 -c "import six; print(six.__version__)"
+
+      - name: Stop http server
+        if: always()
+        run: kill ${{ env.HTTP_PID }} || true
+
+  # ---------------------------------------------------------------------------
+  # Test 1 — wheel from a public PyPI package zip
+  # Uses requests as a well-known package that ships a pre-built wheel.
+  # ---------------------------------------------------------------------------
+  test-wheel:
+    name: Install wheel from zip
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build a zip containing the requests wheel
+        run: |
+          mkdir -p /tmp/pkg
+          pip download requests --no-deps --dest /tmp/pkg
+          cd /tmp/pkg && zip package.zip *.whl
+          sha256sum package.zip | awk '{ print $1 }' > /tmp/checksum.txt
+          echo "CHECKSUM=$(cat /tmp/checksum.txt)" >> "$GITHUB_ENV"
+          python3 -m http.server 8080 --directory /tmp/pkg &
+          echo "HTTP_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Install via action (wheel path, with checksum)
+        id: install
+        uses: ./
+        with:
+          url: 'http://localhost:8080/package.zip'
+          checksum: ${{ env.CHECKSUM }}
+          pip-executable: 'pip3'
+          retries: '2'
+
+      - name: Verify outputs
+        run: |
+          echo "package-name:    ${{ steps.install.outputs.package-name }}"
+          echo "package-version: ${{ steps.install.outputs.package-version }}"
+          test -n "${{ steps.install.outputs.package-name }}"
+          test -n "${{ steps.install.outputs.package-version }}"
+
+      - name: Verify package is importable
+        run: python3 -c "import requests; print(requests.__version__)"
+
+      - name: Stop http server
+        if: always()
+        run: kill ${{ env.HTTP_PID }} || true
+
+  # ---------------------------------------------------------------------------
+  # Test 2 — source tree from a public PyPI sdist zip
+  # Uses a minimal package that ships a pyproject.toml-based source tree.
+  # ---------------------------------------------------------------------------
+  test-source-tree:
+    name: Install source tree from zip
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build a zip containing a source tree
+        run: |
+          mkdir -p /tmp/src/mypackage
+          cat > /tmp/src/pyproject.toml <<'EOF'
+          [build-system]
+          requires = ["setuptools"]
+          build-backend = "setuptools.backends.legacy:build"
+
+          [project]
+          name = "mypackage"
+          version = "1.2.3"
+          EOF
+          cat > /tmp/src/mypackage/__init__.py <<'EOF'
+          __version__ = "1.2.3"
+          EOF
+          cd /tmp && zip -r /tmp/source.zip src/
+          python3 -m http.server 8081 --directory /tmp &
+          echo "HTTP_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Install via action (source tree)
+        id: install
+        uses: ./
+        with:
+          url: 'http://localhost:8081/source.zip'
+          pip-args: '--no-build-isolation'
+
+      - name: Verify outputs
+        run: |
+          echo "package-name:    ${{ steps.install.outputs.package-name }}"
+          echo "package-version: ${{ steps.install.outputs.package-version }}"
+          test -n "${{ steps.install.outputs.package-name }}"
+
+      - name: Stop http server
+        if: always()
+        run: kill ${{ env.HTTP_PID }} || true
+
+  # ---------------------------------------------------------------------------
+  # Test 3 — bad checksum must fail
+  # ---------------------------------------------------------------------------
+  test-bad-checksum:
+    name: Fail on checksum mismatch
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Serve a zip
+        run: |
+          mkdir -p /tmp/bad
+          pip download certifi --no-deps --dest /tmp/bad
+          cd /tmp/bad && zip bad.zip *.whl
+          python3 -m http.server 8082 --directory /tmp/bad &
+          echo "HTTP_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Action should fail with wrong checksum
+        id: should-fail
+        continue-on-error: true
+        uses: ./
+        with:
+          url: 'http://localhost:8082/bad.zip'
+          checksum: '0000000000000000000000000000000000000000000000000000000000000000'
+
+      - name: Assert the step did fail
+        run: |
+          if [ "${{ steps.should-fail.outcome }}" != "failure" ]; then
+            echo "Expected the action to fail on a bad checksum, but it succeeded."
+            exit 1
+          fi
+          echo "Checksum rejection verified."
+
+      - name: Stop http server
+        if: always()
+        run: kill ${{ env.HTTP_PID }} || true
+
+  # ---------------------------------------------------------------------------
+  # Test 4 — matrix across Python versions
+  # ---------------------------------------------------------------------------
+  test-matrix:
+    name: Python ${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.10', '3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Serve a wheel zip (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p /tmp/matrix
+          pip download six --no-deps --dest /tmp/matrix
+          cd /tmp/matrix && zip package.zip *.whl
+          python3 -m http.server 8083 --directory /tmp/matrix &
+          echo "HTTP_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Serve a wheel zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:TEMP\matrix"
+          pip download six --no-deps --dest "$env:TEMP\matrix"
+          Compress-Archive -Path "$env:TEMP\matrix\*.whl" -DestinationPath "$env:TEMP\matrix\package.zip"
+          $job = Start-Job { python -m http.server 8083 --directory "$env:TEMP\matrix" }
+          echo "HTTP_JOB_ID=$($job.Id)" >> $env:GITHUB_ENV
+
+      - name: Install via action
+        id: install
+        uses: ./
+        with:
+          url: 'http://localhost:8083/package.zip'
+
+      - name: Verify outputs and import
+        run: |
+          python -c "import six; print(six.__version__)"
+
+      - name: Stop http server (Unix)
+        if: always() && runner.os != 'Windows'
+        run: kill ${{ env.HTTP_PID }} || true
+
+      - name: Stop http server (Windows)
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: Stop-Job -Id ${{ env.HTTP_JOB_ID }} -ErrorAction SilentlyContinue
